@@ -6,6 +6,7 @@ A simple URL shortener built with **FastAPI** and **SQLAlchemy (async)**. Shorte
 
 - **POST `/shorten`** — accept a long URL, return a short code and the full short URL
 - **GET `/{short_code}`** — 307-redirect to the original URL (404 if the code doesn't exist)
+- Rate limiting (slowapi) on both endpoints to prevent abuse
 - Collision-safe code generation using `secrets.token_urlsafe`
 - Async-first stack (asyncpg / aiosqlite + async SQLAlchemy session)
 - Swagger UI documentation at `/docs`
@@ -106,10 +107,30 @@ Or just open `http://localhost:8000/Ab3xY9` in a browser — it redirects to the
 - `307` — redirect to the original URL
 - `404` — unknown short code
 - `409` — could not generate a unique code (rare collision)
+- `429` — rate limit exceeded
 
 ### Interactive docs
 
 Open [http://localhost:8000/docs](http://localhost:8000/docs) for Swagger UI, or `/redoc` for ReDoc.
+
+## Rate Limiting
+
+Abuse protection is built in with [slowapi](https://github.com/laurentS/slowapi), keyed by the client's IP address:
+
+| Endpoint             | Default limit | Config variable        |
+| -------------------- | ------------- | ---------------------- |
+| `POST /shorten`      | 10/minute     | `SHORTEN_RATE_LIMIT`   |
+| `GET /{short_code}`  | 60/minute     | `REDIRECT_RATE_LIMIT`  |
+
+Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header.
+
+**Multi-worker / production note:** the default `memory://` storage keeps counters per-process, so limits are not shared across workers. Point `RATE_LIMIT_STORAGE` at Redis to get a shared, distributed counter:
+
+```
+RATE_LIMIT_STORAGE=redis://localhost:6379
+```
+
+(Requires a running Redis instance.)
 
 ## How It Works
 
