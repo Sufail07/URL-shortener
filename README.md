@@ -144,6 +144,5 @@ RATE_LIMIT_STORAGE=redis://localhost:6379
 - Configurable code length / expiry dates
 - Click-tracking / analytics
 - Custom aliases (`POST /shorten` with a chosen code)
-- Rate limiting
 - Alembic migrations for schema versioning
 - Docker Compose for a one-command stack (API + PostgreSQL)
