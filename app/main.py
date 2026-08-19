@@ -1,9 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from .schema import ShortenResponse, ShortenRequest
-from .database import get_db, engine, Base
+from .database import get_db
 from sqlalchemy import select
-from contextlib import asynccontextmanager
 from fastapi.responses import RedirectResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -14,14 +13,7 @@ from .config import settings
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=settings.rate_limit_storage)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

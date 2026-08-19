@@ -8,14 +8,15 @@ class URLService:
         self.db = db
 
     async def create_short_url(self, original_url: str) -> URL:
-        code = secrets.token_urlsafe(6)
-        url_entry = URL(original_url=original_url, short_code=code)
-        self.db.add(url_entry)
-        try:
-            await self.db.commit()
-            await self.db.refresh(url_entry)
-            return url_entry
-        except IntegrityError:
-            await self.db.rollback()
-            raise ValueError("URL generation failed due to collision.")
+        for _ in range(5):
+            code = secrets.token_urlsafe(6)
+            url_entry = URL(original_url=original_url, short_code=code)
+            self.db.add(url_entry)
+            try:
+                await self.db.commit()
+                await self.db.refresh(url_entry)
+                return url_entry
+            except IntegrityError:
+                await self.db.rollback()
+        raise ValueError("Could not generate a unique short code.")
 

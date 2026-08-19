@@ -32,7 +32,11 @@ url_shortener/
 │   ├── models.py     # SQLAlchemy URL model
 │   ├── schema.py     # Pydantic request/response schemas
 │   ├── services.py   # Business logic (code generation, collision handling)
-│   └── main.py       # FastAPI app + endpoints + lifespan/startup
+│   └── main.py       # FastAPI app + endpoints
+├── migrations/       # Alembic migration scripts
+│   ├── env.py        # Async migration environment (reads DATABASE_URL)
+│   └── versions/     # Versioned schema migrations
+├── alembic.ini       # Alembic configuration
 ├── .env.example      # Example environment variables
 ├── pyproject.toml    # Project metadata + dependencies
 └── uv.lock           # Locked dependency versions
@@ -63,13 +67,19 @@ The default uses SQLite so you can run it instantly. To use PostgreSQL instead, 
 DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/urlshort
 ```
 
-### 3. Run the server
+### 3. Create the database schema
+
+```bash
+uv run alembic upgrade head
+```
+
+### 4. Run the server
 
 ```bash
 uv run uvicorn app.main:app --reload
 ```
 
-Tables are created automatically on startup via the app lifespan hook (no manual migrations needed for this project).
+Schema is managed with [Alembic](https://alembic.sqlalchemy.org/) migrations instead of auto-creating tables at startup. After changing a model, generate a new migration with `uv run alembic revision --autogenerate -m "describe change"` and apply it with `uv run alembic upgrade head`.
 
 The API will be available at `http://localhost:8000`.
 
@@ -135,14 +145,12 @@ RATE_LIMIT_STORAGE=redis://localhost:6379
 ## How It Works
 
 1. `POST /shorten` validates the URL with Pydantic (`ShortenRequest`).
-2. `URLService` generates a random 6-character code with `secrets.token_urlsafe(6)` and stores it with a `UNIQUE` constraint.
-3. On the rare chance of a collision, the insert raises `IntegrityError`, the transaction is rolled back, and a `409` is returned.
-4. `GET /{short_code}` looks up the code and returns a `RedirectResponse` (307) to the stored URL.
+2. `URLService` generates a random 6-character code with `secrets.token_urlsafe(6)` and stores it with a `UNIQUE` constraint, retrying with a fresh code on the rare `IntegrityError` collision.
+3. `GET /{short_code}` looks up the code and returns a `RedirectResponse` (307) to the stored URL.
 
 ## Roadmap (possible enhancements)
 
 - Configurable code length / expiry dates
 - Click-tracking / analytics
 - Custom aliases (`POST /shorten` with a chosen code)
-- Alembic migrations for schema versioning
 - Docker Compose for a one-command stack (API + PostgreSQL)
